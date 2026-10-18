@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuraGlassSchema",
+  "entities": {
+    "User": {
+      "collection": "users",
+      "path": "users/{userId}",
+      "fields": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["displayName", "createdAt"]
+    },
+    "Message": {
+      "collection": "messages",
+      "path": "users/{userId}/messages/{messageId}",
+      "fields": {
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "timestamp" },
+        "mediaUri": { "type": "string" }
+      },
+      "required": ["senderId", "text", "timestamp"]
+    }
+  }
+}

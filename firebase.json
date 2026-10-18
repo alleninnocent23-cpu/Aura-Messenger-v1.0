@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-android-auraglas-f286a867-08f7-42df-bc03-c56d1f17edab",
+      "rules": "firestore.rules"
+    }
+  ]
+}

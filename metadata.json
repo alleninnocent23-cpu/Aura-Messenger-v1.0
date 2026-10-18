@@ -1,0 +1,6 @@
+{
+  "name": "Aura Glass",
+  "description": "Pure monochrome liquid glassmorphism messenger and premium login experience with organic depth and fluid reflections.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
