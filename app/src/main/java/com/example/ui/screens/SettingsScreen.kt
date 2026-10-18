@@ -237,11 +237,11 @@ fun SettingsScreen(
                     Text(text = "Dial →", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
 
-                // Add Real Contact
+                // Start Real Chat
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { viewModel.showNewContactDialog(true) },
+                        .clickable { viewModel.showStartChatDialog(true) },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -249,11 +249,11 @@ fun SettingsScreen(
                         Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text(text = "Add Real Contact", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            Text(text = "Store custom phone numbers in Room database", color = TextWhiteMuted, fontSize = 12.sp)
+                            Text(text = "Start Real Chat", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text(text = "Connect with any email or phone on Firestore", color = TextWhiteMuted, fontSize = 12.sp)
                         }
                     }
-                    Text(text = "+ Add", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(text = "+ Chat", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
 
                 // Sign Out

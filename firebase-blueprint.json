@@ -6,23 +6,43 @@
       "collection": "users",
       "path": "users/{userId}",
       "fields": {
+        "userId": { "type": "string" },
         "displayName": { "type": "string" },
         "email": { "type": "string" },
         "phoneNumber": { "type": "string" },
-        "createdAt": { "type": "timestamp" }
+        "avatarMonogram": { "type": "string" },
+        "updatedAt": { "type": "timestamp" }
       },
-      "required": ["displayName", "createdAt"]
+      "required": ["userId", "displayName"]
+    },
+    "Conversation": {
+      "collection": "conversations",
+      "path": "conversations/{conversationId}",
+      "fields": {
+        "conversationId": { "type": "string" },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "participantNames": { "type": "object" },
+        "lastMessage": { "type": "string" },
+        "lastSenderId": { "type": "string" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "required": ["conversationId", "participants"]
     },
     "Message": {
       "collection": "messages",
-      "path": "users/{userId}/messages/{messageId}",
+      "path": "conversations/{conversationId}/messages/{messageId}",
       "fields": {
+        "id": { "type": "string" },
+        "conversationId": { "type": "string" },
         "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
         "text": { "type": "string" },
         "timestamp": { "type": "timestamp" },
-        "mediaUri": { "type": "string" }
+        "mediaUri": { "type": "string" },
+        "mediaType": { "type": "string" },
+        "fileName": { "type": "string" }
       },
-      "required": ["senderId", "text", "timestamp"]
+      "required": ["id", "conversationId", "senderId", "text"]
     }
   }
 }

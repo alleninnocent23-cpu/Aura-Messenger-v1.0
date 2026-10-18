@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,9 +25,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
@@ -54,18 +52,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
-import com.example.data.local.entity.ConversationEntity
+import com.example.data.firebase.RealConversation
+import com.example.data.firebase.UserProfile
 import com.example.ui.components.LiquidGlassAvatar
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.LiquidGlassInputField
 import com.example.ui.components.LiquidGlassPillButton
 import com.example.ui.glass.liquidGlassOrb
 import com.example.ui.theme.GlassBorderBright
-import com.example.ui.theme.GlassBorderSubtle
 import com.example.ui.theme.TextDarkPrimary
 import com.example.ui.theme.TextWhiteMuted
 import com.example.ui.theme.TextWhitePrimary
@@ -82,16 +80,16 @@ fun ChatListScreen(
     viewModel: AuraViewModel,
     modifier: Modifier = Modifier
 ) {
-    val filteredConversations = uiState.roomConversations.filter {
-        it.name.contains(uiState.searchQuery, ignoreCase = true) ||
-                it.lastMessage.contains(uiState.searchQuery, ignoreCase = true) ||
-                it.phoneNumber.contains(uiState.searchQuery)
+    val myUid = uiState.currentProfile?.id ?: ""
+
+    val filteredConversations = uiState.realConversations.filter { conv ->
+        val otherName = conv.participantNames.entries.firstOrNull { it.key != myUid }?.value ?: "User"
+        otherName.contains(uiState.searchQuery, ignoreCase = true) ||
+                conv.lastMessage.contains(uiState.searchQuery, ignoreCase = true)
     }
 
-    var newContactName by remember { mutableStateOf("") }
-    var newContactPhone by remember { mutableStateOf("") }
-    var newContactBio by remember { mutableStateOf("") }
-
+    var startChatInput by remember { mutableStateOf("") }
+    var startChatNameInput by remember { mutableStateOf("") }
     var dialNumberInput by remember { mutableStateOf("") }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -100,107 +98,142 @@ fun ChatListScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-            // Poured Liquid Glass Header & Search Bar
+            // Header Bar & Search Bar
             LiquidMessengerTopBar(
                 searchQuery = uiState.searchQuery,
                 onSearchChange = { viewModel.updateSearchQuery(it) },
-                onAddContact = { viewModel.showNewContactDialog(true) },
+                onStartChat = { viewModel.showStartChatDialog(true) },
                 onDirectDial = { viewModel.showDirectDialDialog(true) },
                 onSignOut = { viewModel.signOut() },
-                profileName = uiState.currentProfile?.displayName ?: "Aura Member"
+                profileName = uiState.currentProfile?.displayName ?: "User"
             )
 
-            // Status Stories Tray
-            LiquidStatusTray(stories = uiState.statusStories)
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Conversation List: Floating Liquid Glass Capsules from Room
-            if (filteredConversations.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // Conversations List
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (filteredConversations.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .shadow(14.dp, RoundedCornerShape(24.dp), ambientColor = Color(0x35FFFFFF))
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(Color(0x18FFFFFF))
+                                .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(24.dp))
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "Real Cloud Messaging",
+                                    color = Color.White,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Start a real conversation with any email, phone, or registered user below!",
+                                    color = TextWhiteSecondary,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                LiquidGlassPillButton(
+                                    text = "+ Start Real Chat",
+                                    onClick = { viewModel.showStartChatDialog(true) },
+                                    testTag = "empty_start_chat_button"
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    item {
                         Text(
-                            text = "No conversations yet",
-                            color = TextWhitePrimary,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Tap '+ Contact' to add a real person with their phone number.",
+                            text = "ACTIVE CONVERSATIONS",
                             color = TextWhiteMuted,
-                            fontSize = 13.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                         )
                     }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+
                     items(
                         items = filteredConversations,
                         key = { it.id }
                     ) { conversation ->
-                        LiquidConversationCapsule(
-                            conversation = conversation,
-                            onClick = { viewModel.openChat(conversation.id) },
-                            onCallClick = { viewModel.dialContact(conversation) }
+                        val otherUid = conversation.participants.firstOrNull { it != myUid } ?: myUid
+                        val otherName = conversation.participantNames[otherUid] ?: "User"
+
+                        LiquidRealConversationCapsule(
+                            otherName = otherName,
+                            lastMessage = conversation.lastMessage,
+                            updatedAt = conversation.updatedAt?.seconds?.times(1000) ?: System.currentTimeMillis(),
+                            onClick = { viewModel.openConversation(conversation) },
+                            onCallClick = { viewModel.dialRealPhone(otherUid) }
+                        )
+                    }
+                }
+
+                // Show other real registered users in Firestore
+                val otherUsers = uiState.allRegisteredUsers.filter { it.userId != myUid }
+                if (otherUsers.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "REGISTERED USERS IN FIRESTORE",
+                            color = TextWhiteMuted,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+
+                    items(otherUsers, key = { it.userId }) { user ->
+                        LiquidUserDirectoryRow(
+                            user = user,
+                            onStartChat = {
+                                viewModel.startChatWithRealUser(
+                                    otherUserId = user.userId,
+                                    otherName = user.displayName
+                                )
+                            }
                         )
                     }
                 }
             }
         }
 
-        // Floating Action Button: Add New Contact
+        // Floating Action Button
         FloatingActionButton(
-            onClick = { viewModel.showNewContactDialog(true) },
+            onClick = { viewModel.showStartChatDialog(true) },
             containerColor = Color.Transparent,
             elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(0.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 24.dp, bottom = 96.dp)
-                .shadow(
-                    elevation = 18.dp,
-                    shape = CircleShape,
-                    ambientColor = Color(0x80FFFFFF),
-                    spotColor = Color(0x90000000)
-                )
+                .shadow(18.dp, CircleShape, ambientColor = Color(0x80FFFFFF))
                 .clip(CircleShape)
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color(0xFFFFFFFF), Color(0xFFE4E4EB))
-                    )
-                )
-                .border(1.dp, Color.White, CircleShape)
+                .background(Color.White)
                 .size(56.dp)
-                .testTag("fab_add_contact")
+                .testTag("fab_start_chat")
         ) {
-            Icon(
-                imageVector = Icons.Default.PersonAdd,
-                contentDescription = "New Contact",
-                tint = TextDarkPrimary,
-                modifier = Modifier.size(24.dp)
-            )
+            Icon(imageVector = Icons.Default.Chat, contentDescription = "New Chat", tint = TextDarkPrimary, modifier = Modifier.size(24.dp))
         }
 
-        // Add Real Contact Modal
-        if (uiState.showNewContactDialog) {
+        // Start Real Chat Dialog
+        if (uiState.showStartChatDialog) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xD9000000))
-                    .clickable { viewModel.showNewContactDialog(false) }
+                    .clickable { viewModel.showStartChatDialog(false) }
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -216,63 +249,62 @@ fun ChatListScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Add Real Contact",
+                            text = "Start Real Chat",
                             color = Color.White,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        IconButton(onClick = { viewModel.showNewContactDialog(false) }) {
+                        IconButton(onClick = { viewModel.showStartChatDialog(false) }) {
                             Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = "Enter any email address, username, or telephone number to create an active Firestore chat room.",
+                        color = TextWhiteSecondary,
+                        fontSize = 13.sp
+                    )
+
                     Spacer(modifier = Modifier.height(16.dp))
 
                     LiquidGlassInputField(
-                        value = newContactName,
-                        onValueChange = { newContactName = it },
-                        placeholder = "Contact Name (e.g. Alex Vance)",
-                        testTag = "input_contact_name"
+                        value = startChatInput,
+                        onValueChange = { startChatInput = it },
+                        placeholder = "Email or Phone (+1 555-0199)",
+                        testTag = "input_start_chat_id"
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
 
                     LiquidGlassInputField(
-                        value = newContactPhone,
-                        onValueChange = { newContactPhone = it },
-                        placeholder = "Real Phone Number (+1 555-0199)",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        testTag = "input_contact_phone"
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    LiquidGlassInputField(
-                        value = newContactBio,
-                        onValueChange = { newContactBio = it },
-                        placeholder = "Bio / Note (optional)",
-                        testTag = "input_contact_bio"
+                        value = startChatNameInput,
+                        onValueChange = { startChatNameInput = it },
+                        placeholder = "Contact Name (optional)",
+                        testTag = "input_start_chat_name"
                     )
 
                     Spacer(modifier = Modifier.height(20.dp))
 
                     LiquidGlassPillButton(
-                        text = "Save Contact & Start Chat",
+                        text = "Open Chat Room",
                         onClick = {
-                            if (newContactName.isNotBlank() && newContactPhone.isNotBlank()) {
-                                viewModel.createNewContact(newContactName, newContactPhone, newContactBio)
-                                newContactName = ""
-                                newContactPhone = ""
-                                newContactBio = ""
+                            if (startChatInput.isNotBlank()) {
+                                viewModel.startChatWithEmailOrPhone(
+                                    identifier = startChatInput,
+                                    name = startChatNameInput
+                                )
+                                startChatInput = ""
+                                startChatNameInput = ""
                             }
                         },
-                        testTag = "save_contact_button"
+                        testTag = "button_confirm_start_chat"
                     )
                 }
             }
         }
 
-        // Direct Dial Modal
+        // Direct Dial Dialog
         if (uiState.showDirectDialDialog) {
             Box(
                 modifier = Modifier
@@ -294,7 +326,7 @@ fun ChatListScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Direct Phone Call",
+                            text = "Call Real Phone",
                             color = Color.White,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
@@ -304,9 +336,9 @@ fun ChatListScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Enter any real telephone number to place an immediate carrier/cellular phone call through Android dialer.",
+                        text = "Enter any phone number to dial using the Android cellular system.",
                         color = TextWhiteSecondary,
                         fontSize = 13.sp
                     )
@@ -316,24 +348,25 @@ fun ChatListScreen(
                     LiquidGlassInputField(
                         value = dialNumberInput,
                         onValueChange = { dialNumberInput = it },
-                        placeholder = "+1 (555) 000-0000",
+                        placeholder = "+1 555-0199",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         leadingIcon = Icons.Default.Phone,
-                        testTag = "input_direct_dial"
+                        testTag = "input_dial_phone"
                     )
 
                     Spacer(modifier = Modifier.height(20.dp))
 
                     LiquidGlassPillButton(
-                        text = "Dial on Real Phone",
+                        text = "Dial on Phone",
                         onClick = {
                             if (dialNumberInput.isNotBlank()) {
-                                viewModel.dialCustomNumber(dialNumberInput)
+                                viewModel.dialRealPhone(dialNumberInput)
+                                viewModel.showDirectDialDialog(false)
                                 dialNumberInput = ""
                             }
                         },
                         icon = Icons.Default.Call,
-                        testTag = "button_execute_dial"
+                        testTag = "button_dial_confirm"
                     )
                 }
             }
@@ -345,7 +378,7 @@ fun ChatListScreen(
 private fun LiquidMessengerTopBar(
     searchQuery: String,
     onSearchChange: (String) -> Unit,
-    onAddContact: () -> Unit,
+    onStartChat: () -> Unit,
     onDirectDial: () -> Unit,
     onSignOut: () -> Unit,
     profileName: String
@@ -368,9 +401,9 @@ private fun LiquidMessengerTopBar(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "A",
+                        text = profileName.take(1).uppercase().ifBlank { "A" },
                         color = Color.White,
-                        fontSize = 18.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -379,22 +412,22 @@ private fun LiquidMessengerTopBar(
 
                 Column {
                     Text(
-                        text = "Aura Chats",
+                        text = "Aura Real Chat",
                         color = TextWhitePrimary,
-                        fontSize = 19.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = profileName,
                         color = TextWhiteMuted,
-                        fontSize = 11.sp,
+                        fontSize = 11.5.sp,
                         maxLines = 1
                     )
                 }
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Direct Phone Dial button
+                // Call Phone button
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
@@ -405,48 +438,28 @@ private fun LiquidMessengerTopBar(
                         .testTag("direct_dial_button")
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Call,
-                            contentDescription = "Dial",
-                            tint = Color.White,
-                            modifier = Modifier.size(13.dp)
-                        )
+                        Icon(imageVector = Icons.Default.Call, contentDescription = "Dial", tint = Color.White, modifier = Modifier.size(13.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Dial",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Text(text = "Call Phone", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     }
                 }
 
                 Spacer(modifier = Modifier.width(6.dp))
 
-                // + Contact button
+                // + Chat button
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
                         .background(Color(0x18FFFFFF))
                         .border(1.dp, Color(0x35FFFFFF), RoundedCornerShape(14.dp))
-                        .clickable(onClick = onAddContact)
+                        .clickable(onClick = onStartChat)
                         .padding(horizontal = 9.dp, vertical = 6.dp)
-                        .testTag("add_contact_top_button")
+                        .testTag("start_chat_top_button")
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.PersonAdd,
-                            contentDescription = "Add Contact",
-                            tint = Color.White,
-                            modifier = Modifier.size(13.dp)
-                        )
+                        Icon(imageVector = Icons.Default.Add, contentDescription = "New Chat", tint = Color.White, modifier = Modifier.size(13.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "+ Contact",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Text(text = "New Chat", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     }
                 }
 
@@ -459,12 +472,7 @@ private fun LiquidMessengerTopBar(
                         .liquidGlassOrb(fillAlpha = 0.12f, borderAlpha = 0.35f)
                         .testTag("header_lock_button")
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Lock,
-                        contentDescription = "Lock",
-                        tint = TextWhiteSecondary,
-                        modifier = Modifier.size(15.dp)
-                    )
+                    Icon(imageVector = Icons.Outlined.Lock, contentDescription = "Lock", tint = TextWhiteSecondary, modifier = Modifier.size(15.dp))
                 }
             }
         }
@@ -476,7 +484,7 @@ private fun LiquidMessengerTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp)
-                .shadow(elevation = 12.dp, shape = RoundedCornerShape(24.dp), ambientColor = Color(0x35FFFFFF))
+                .shadow(12.dp, RoundedCornerShape(24.dp), ambientColor = Color(0x35FFFFFF))
                 .clip(RoundedCornerShape(24.dp))
                 .background(
                     brush = Brush.verticalGradient(
@@ -495,26 +503,12 @@ private fun LiquidMessengerTopBar(
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.CenterStart
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "Search",
-                    tint = TextWhiteMuted,
-                    modifier = Modifier.size(18.dp)
-                )
-
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Icon(imageVector = Icons.Default.Search, contentDescription = "Search", tint = TextWhiteMuted, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(10.dp))
-
                 Box(modifier = Modifier.weight(1f)) {
                     if (searchQuery.isEmpty()) {
-                        Text(
-                            text = "Search messages, real names or phones...",
-                            color = TextWhiteMuted,
-                            fontSize = 13.5.sp
-                        )
+                        Text(text = "Search real conversations or users...", color = TextWhiteMuted, fontSize = 13.5.sp)
                     }
                     BasicTextField(
                         value = searchQuery,
@@ -522,9 +516,7 @@ private fun LiquidMessengerTopBar(
                         singleLine = true,
                         textStyle = TextStyle(color = TextWhitePrimary, fontSize = 14.sp),
                         cursorBrush = SolidColor(TextWhitePrimary),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("chat_search_input")
+                        modifier = Modifier.fillMaxWidth().testTag("chat_search_input")
                     )
                 }
             }
@@ -533,72 +525,22 @@ private fun LiquidMessengerTopBar(
 }
 
 @Composable
-private fun LiquidStatusTray(stories: List<com.example.model.StatusStory>) {
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(contentAlignment = Alignment.BottomEnd) {
-                    LiquidGlassAvatar(
-                        avatarRes = R.drawable.img_glass_avatar,
-                        monogram = "ME",
-                        size = 52.dp
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(18.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
-                            .border(1.dp, Color(0xFF0C0C10), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = "Add", tint = Color.Black, modifier = Modifier.size(12.dp))
-                    }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = "My Status", color = TextWhiteSecondary, fontSize = 11.sp)
-            }
-        }
-
-        items(stories) { story ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                LiquidGlassAvatar(
-                    avatarRes = story.user.avatarDrawableRes,
-                    monogram = story.user.avatarMonogram,
-                    size = 52.dp,
-                    hasStoryRing = true,
-                    storyViewed = story.isViewed
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = story.user.name.substringBefore(" "),
-                    color = TextWhiteSecondary,
-                    fontSize = 11.sp,
-                    maxLines = 1
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun LiquidConversationCapsule(
-    conversation: ConversationEntity,
+private fun LiquidRealConversationCapsule(
+    otherName: String,
+    lastMessage: String,
+    updatedAt: Long,
     onClick: () -> Unit,
     onCallClick: () -> Unit
 ) {
-    val timeFormatted = remember(conversation.timestamp) {
+    val timeFormatted = remember(updatedAt) {
         val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
-        sdf.format(Date(conversation.timestamp))
+        sdf.format(Date(updatedAt))
     }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(elevation = 10.dp, shape = RoundedCornerShape(22.dp), ambientColor = Color(0x30FFFFFF))
+            .shadow(10.dp, RoundedCornerShape(22.dp), ambientColor = Color(0x30FFFFFF))
             .clip(RoundedCornerShape(22.dp))
             .background(
                 brush = Brush.verticalGradient(
@@ -616,17 +558,13 @@ private fun LiquidConversationCapsule(
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 13.dp)
-            .testTag("conversation_row_${conversation.id}")
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             LiquidGlassAvatar(
-                avatarRes = if (conversation.id == "conv_alex") R.drawable.img_glass_avatar else null,
-                monogram = conversation.avatarMonogram,
+                avatarRes = null,
+                monogram = otherName.take(2).uppercase().ifBlank { "US" },
                 size = 50.dp,
-                isOnline = conversation.isOnline
+                isOnline = true
             )
 
             Spacer(modifier = Modifier.width(14.dp))
@@ -638,7 +576,7 @@ private fun LiquidConversationCapsule(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = conversation.name,
+                        text = otherName,
                         color = TextWhitePrimary,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
@@ -650,22 +588,11 @@ private fun LiquidConversationCapsule(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-                Text(
-                    text = conversation.phoneNumber,
-                    color = Color(0x80FFFFFF),
-                    fontSize = 11.5.sp
-                )
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = conversation.lastMessage,
+                        text = lastMessage,
                         color = TextWhiteSecondary,
                         fontSize = 13.sp,
                         maxLines = 1,
@@ -673,19 +600,55 @@ private fun LiquidConversationCapsule(
                         modifier = Modifier.weight(1f)
                     )
 
-                    // Quick call button
-                    IconButton(
-                        onClick = onCallClick,
-                        modifier = Modifier.size(30.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Call,
-                            contentDescription = "Call ${conversation.name}",
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
+                    IconButton(onClick = onCallClick, modifier = Modifier.size(30.dp)) {
+                        Icon(imageVector = Icons.Default.Call, contentDescription = "Call", tint = Color.White, modifier = Modifier.size(16.dp))
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiquidUserDirectoryRow(
+    user: UserProfile,
+    onStartChat: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(6.dp, RoundedCornerShape(18.dp), ambientColor = Color(0x20FFFFFF))
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0x14FFFFFF))
+            .border(1.dp, Color(0x25FFFFFF), RoundedCornerShape(18.dp))
+            .clickable(onClick = onStartChat)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LiquidGlassAvatar(
+                    avatarRes = null,
+                    monogram = user.avatarMonogram.ifBlank { user.displayName.take(2).uppercase() },
+                    size = 42.dp
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(text = user.displayName, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(text = user.email.ifBlank { user.phoneNumber }, color = TextWhiteMuted, fontSize = 12.sp)
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0x24FFFFFF))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text(text = "Chat →", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }

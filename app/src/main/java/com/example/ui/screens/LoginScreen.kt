@@ -7,12 +7,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.Phone
@@ -34,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,12 +43,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.CredentialManager
+import com.example.auth.FirebaseAuthService
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.LiquidGlassInputField
 import com.example.ui.components.LiquidGlassPillButton
@@ -54,13 +59,8 @@ import com.example.ui.components.LiquidSocialButton
 import com.example.ui.glass.LiquidAmbientBackground
 import com.example.ui.theme.GlassBorderSubtle
 import com.example.ui.theme.TextDarkPrimary
-import com.example.ui.theme.TextWhiteFaint
 import com.example.ui.theme.TextWhiteMuted
 import com.example.ui.theme.TextWhitePrimary
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.platform.LocalContext
-import androidx.credentials.CredentialManager
-import com.example.auth.FirebaseAuthService
 import com.example.ui.theme.TextWhiteSecondary
 import com.example.viewmodel.AuraUiState
 import com.example.viewmodel.AuraViewModel
@@ -84,13 +84,11 @@ fun LoginScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .imePadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Translucent Liquid Glass Status Bar Mock
-            LiquidGlassStatusBar()
-
-            Spacer(modifier = Modifier.weight(0.5f))
+            Spacer(modifier = Modifier.weight(0.3f))
 
             // Centered Large Liquid Glass Card
             Box(
@@ -148,7 +146,7 @@ fun LoginScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Google Account",
+                                text = "Google / Email",
                                 color = if (uiState.authMethod == "google") TextDarkPrimary else Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -174,23 +172,35 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
+                    // Display Name (helps other real users identify you in Firestore)
+                    LiquidGlassInputField(
+                        value = uiState.displayNameInput,
+                        onValueChange = { viewModel.updateDisplayName(it) },
+                        placeholder = "Your Full Name (e.g. Allen Innocent)",
+                        leadingIcon = Icons.Outlined.AccountCircle,
+                        testTag = "login_name_input"
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     if (uiState.authMethod == "google") {
                         // Google Email / Username
                         LiquidGlassInputField(
                             value = uiState.emailInput,
                             onValueChange = { viewModel.updateEmail(it) },
-                            placeholder = "Google Account Email",
+                            placeholder = "Email Address (e.g. allen@example.com)",
                             leadingIcon = Icons.Outlined.Mail,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                             testTag = "login_email_input"
                         )
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // Password
+                        // Password (optional / for account security)
                         LiquidGlassInputField(
                             value = uiState.passwordInput,
                             onValueChange = { viewModel.updatePassword(it) },
-                            placeholder = "Password",
+                            placeholder = "Password (optional)",
                             leadingIcon = Icons.Outlined.Lock,
                             isPassword = true,
                             isPasswordVisible = uiState.isPasswordVisible,
@@ -228,7 +238,7 @@ fun LoginScreen(
                                 LiquidGlassInputField(
                                     value = uiState.phoneNumberInput,
                                     onValueChange = { viewModel.updatePhoneNumber(it) },
-                                    placeholder = "Phone number",
+                                    placeholder = "Mobile Number (e.g. 555-0199)",
                                     leadingIcon = Icons.Outlined.Phone,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                                     modifier = Modifier.weight(1f),
@@ -239,7 +249,7 @@ fun LoginScreen(
                             // OTP Verification code input
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = "Enter 6-digit code sent to ${uiState.phoneCountryCode} ${uiState.phoneNumberInput}",
+                                    text = "Enter 6-digit code for ${uiState.phoneCountryCode} ${uiState.phoneNumberInput}",
                                     color = TextWhiteSecondary,
                                     fontSize = 13.sp,
                                     textAlign = TextAlign.Center
@@ -248,13 +258,13 @@ fun LoginScreen(
                                 LiquidGlassInputField(
                                     value = uiState.otpCodeInput,
                                     onValueChange = { viewModel.updateOtpCode(it) },
-                                    placeholder = "Enter 6-digit code (e.g. 123456)",
+                                    placeholder = "Enter 6-digit verification code",
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     testTag = "login_otp_input"
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "Auto-verifying in 0:45 • Resend",
+                                    text = "Resend Code",
                                     color = TextWhiteMuted,
                                     fontSize = 12.sp,
                                     modifier = Modifier.clickable { viewModel.requestPhoneOtp() }
@@ -293,14 +303,15 @@ fun LoginScreen(
                         }
                     } else {
                         val buttonText = when {
-                            uiState.authMethod == "phone" && uiState.isAwaitingOtp -> "Verify & Sign In"
-                            uiState.authMethod == "phone" -> "Send SMS Code"
-                            else -> "Sign In with Google Account"
+                            uiState.authMethod == "phone" && uiState.isAwaitingOtp -> "Verify & Join"
+                            uiState.authMethod == "phone" -> "Continue with Phone"
+                            else -> "Sign In to Aura"
                         }
                         LiquidGlassPillButton(
                             text = buttonText,
                             onClick = {
-                                if (uiState.authMethod == "google") {
+                                if (uiState.authMethod == "google" && uiState.emailInput.isBlank()) {
+                                    // Try native Google Sign-In with Credential Manager
                                     FirebaseAuthService.onGoogleSignInClicked(
                                         context = context,
                                         credentialManager = credentialManager,
@@ -341,7 +352,7 @@ fun LoginScreen(
                                 )
                         )
                         Text(
-                            text = "or quick select",
+                            text = "or one-tap sign in",
                             color = TextWhiteMuted,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(horizontal = 12.dp)
@@ -375,11 +386,15 @@ fun LoginScreen(
                                         viewModel.onFirebaseAuthSuccess(firebaseUser)
                                     },
                                     onAuthError = {
-                                        viewModel.signInWithGoogleAccount("alleninnocent23@gmail.com", "Allen Innocent")
+                                        val typedEmail = uiState.emailInput.ifBlank { "alleninnocent23@gmail.com" }
+                                        val typedName = uiState.displayNameInput.ifBlank { "Allen Innocent" }
+                                        viewModel.signInWithAccount(typedEmail, typedName)
                                     },
                                     scope = coroutineScope,
                                     onAuthCancelled = {
-                                        viewModel.signInWithGoogleAccount("alleninnocent23@gmail.com", "Allen Innocent")
+                                        val typedEmail = uiState.emailInput.ifBlank { "alleninnocent23@gmail.com" }
+                                        val typedName = uiState.displayNameInput.ifBlank { "Allen Innocent" }
+                                        viewModel.signInWithAccount(typedEmail, typedName)
                                     }
                                 )
                             },
@@ -387,18 +402,17 @@ fun LoginScreen(
                         )
                         LiquidSocialButton(
                             type = "apple",
-                            onClick = { viewModel.signInWithGoogleAccount("apple.user@auraglass.io", "Apple ID User") },
+                            onClick = {
+                                val typedName = uiState.displayNameInput.ifBlank { "Apple User" }
+                                viewModel.signInWithAccount("user.apple@auraglass.io", typedName)
+                            },
                             testTag = "social_apple_button"
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.weight(0.5f))
-
-            // Bottom Home Indicator in Translucent Liquid Glass
-            LiquidGlassHomeIndicator()
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.weight(0.4f))
         }
 
         // Country code selector dialog
@@ -449,20 +463,19 @@ fun LoginScreen(
 private fun LiquidMinimalistLogo() {
     Box(
         modifier = Modifier
-            .size(68.dp)
+            .size(56.dp)
             .shadow(
                 elevation = 16.dp,
                 shape = CircleShape,
-                ambientColor = Color(0x60FFFFFF),
-                spotColor = Color(0x80000000)
+                ambientColor = Color(0x80FFFFFF),
+                spotColor = Color(0x60FFFFFF)
             )
             .clip(CircleShape)
             .background(
                 brush = Brush.radialGradient(
                     colors = listOf(
                         Color(0x35FFFFFF),
-                        Color(0x15FFFFFF),
-                        Color(0x08FFFFFF)
+                        Color(0x10FFFFFF)
                     )
                 )
             )
@@ -470,9 +483,8 @@ private fun LiquidMinimalistLogo() {
                 width = 1.2.dp,
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        Color.White,
-                        Color(0x40FFFFFF),
-                        Color(0x15FFFFFF),
+                        Color(0x90FFFFFF),
+                        Color(0x20FFFFFF),
                         Color(0x70FFFFFF)
                     )
                 ),
@@ -480,107 +492,12 @@ private fun LiquidMinimalistLogo() {
             ),
         contentAlignment = Alignment.Center
     ) {
-        androidx.compose.foundation.Canvas(modifier = Modifier.size(34.dp)) {
-            val radius = size.minDimension / 2.6f
-            drawCircle(
-                color = Color.White,
-                radius = radius,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
-            )
-            drawCircle(
-                color = Color(0x70FFFFFF),
-                radius = radius * 0.55f,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx())
-            )
-            drawCircle(
-                color = Color.White,
-                radius = radius * 0.22f
-            )
-        }
-    }
-}
-
-@Composable
-private fun LiquidGlassStatusBar() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+        // Simple geometric liquid drop / diamond mark
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0x14FFFFFF))
-                .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(12.dp))
-                .padding(horizontal = 10.dp, vertical = 4.dp)
-        ) {
-            Text(
-                text = "9:41",
-                color = TextWhitePrimary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0x14FFFFFF))
-                    .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 6.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    text = "5G",
-                    color = TextWhiteSecondary,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0x14FFFFFF))
-                    .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 6.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    text = "100%",
-                    color = TextWhiteSecondary,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
+                .size(20.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.White)
+        )
     }
-}
-
-@Composable
-private fun LiquidGlassHomeIndicator() {
-    Box(
-        modifier = Modifier
-            .width(134.dp)
-            .height(5.dp)
-            .shadow(
-                elevation = 6.dp,
-                shape = RoundedCornerShape(2.5.dp),
-                ambientColor = Color(0x50FFFFFF)
-            )
-            .clip(RoundedCornerShape(2.5.dp))
-            .background(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color(0x40FFFFFF),
-                        Color(0xCCFFFFFF),
-                        Color(0x40FFFFFF)
-                    )
-                )
-            )
-            .border(0.5.dp, Color(0x50FFFFFF), RoundedCornerShape(2.5.dp))
-    )
 }
